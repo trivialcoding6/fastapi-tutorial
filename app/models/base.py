@@ -1,4 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
-    pass
+    
+    class Config:
+        arbitrary_types_allowed = True

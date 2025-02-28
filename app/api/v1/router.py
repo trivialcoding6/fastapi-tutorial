@@ -4,5 +4,6 @@ router = APIRouter()
 
 router.include_router(
     todo.router,
-    tags=["todo"]
+    tags=["todo"],
+    prefix="/todos"
 )
