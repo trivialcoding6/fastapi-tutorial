@@ -23,6 +23,7 @@ pip-delete-this-directory.txt
 Thumbs.db
 
 # 로그 파일
+logs/
 *.log
 
 # 테스트 커버리지
