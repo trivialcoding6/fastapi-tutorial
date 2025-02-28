@@ -1,0 +1,90 @@
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_build:
+        description: "빌드 과정 건너뛰기 (환경 변수만 변경 시)"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY_LOGIN_SERVER: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+  CONTAINER_APP_NAME: ${{ secrets.CONTAINER_APP_NAME }}
+  RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+  CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build:
+    name: 이미지 빌드 및 푸시
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.skip_build == 'false' }}
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v3
+
+      - name: Azure 로그인
+        uses: azure/login@v1
+        with:
+          creds: ${{ env.CREDENTIALS }}
+
+      - name: ACR 로그인
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.REGISTRY_LOGIN_SERVER }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
+      - name: 이미지 빌드 및 푸시
+        run: |
+          docker build -t ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .
+          docker push ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          # 최신 태그도 함께 푸시
+          docker tag ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: 이미지 태그 저장
+        id: save_image_tag
+        run: echo "IMAGE_TAG=${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
+    outputs:
+      image_tag: ${{ steps.save_image_tag.outputs.IMAGE_TAG }}
+
+  deploy:
+    name: Azure Container Apps 배포
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ always() && (needs.build.result == 'success' || github.event.inputs.skip_build == 'true') }}
+
+    steps:
+      - name: Azure 로그인
+        uses: azure/login@v1
+        with:
+          creds: ${{ env.CREDENTIALS }}
+
+      - name: 이미지 태그 설정
+        id: set_image_tag
+        run: |
+          if [[ "${{ github.event.inputs.skip_build }}" == "true" ]]; then
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=${{ needs.build.outputs.image_tag }}" >> $GITHUB_ENV
+          fi
+
+      - name: Azure CLI 설치
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az containerapp update \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --image ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+              --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" "SYNC_DATABASE_URL=${{ secrets.SYNC_DATABASE_URL }}" "DB_ECHO_LOG=${{ secrets.DB_ECHO_LOG }}"

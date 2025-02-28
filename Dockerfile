@@ -10,24 +10,17 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Poetry 설치 및 설정
-ENV POETRY_HOME=/opt/poetry \
-    POETRY_VERSION=1.7.1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_HTTP_TIMEOUT=120
 
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-# 의존성 파일 복사 및 설치
+RUN poetry config virtualenvs.create false
+
 COPY pyproject.toml poetry.lock* ./
-RUN poetry install --only main --no-root
+RUN poetry install --only main --no-root --no-interaction
 
-# 애플리케이션 코드 복사
 COPY . .
 
-# 환경 변수 설정
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
