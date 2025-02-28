@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from app.core.config import to_camel
+from app.utils.to_camel import to_camel
 
 class CamelBaseModel(BaseModel):
     """모든 스키마의 기본 클래스로, camelCase 변환을 적용합니다."""

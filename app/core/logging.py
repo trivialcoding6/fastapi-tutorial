@@ -2,7 +2,6 @@ import logging
 import sys
 from typing import List
 from loguru import logger
-from app.core.config import settings
 
 class InterceptHandler(logging.Handler):
     def emit(self, record):
