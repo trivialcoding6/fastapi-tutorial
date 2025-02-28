@@ -87,4 +87,5 @@ jobs:
               --name ${{ env.CONTAINER_APP_NAME }} \
               --resource-group ${{ env.RESOURCE_GROUP }} \
               --image ${{ env.REGISTRY_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+              --min-replicas 1 \
               --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" "SYNC_DATABASE_URL=${{ secrets.SYNC_DATABASE_URL }}" "DB_ECHO_LOG=${{ secrets.DB_ECHO_LOG }}"
